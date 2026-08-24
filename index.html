@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADBUQ Billboards - Premium Listings</title>
+    <!-- Modern font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <!-- PyScript -->
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css" />
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="index.css">
+</head>
+<body>
+    <header>
+        <h1>ADBUQ Premium Billboards</h1>
+    </header>
+
+    <main class="container">
+        <div id="loading" class="loading">
+            Loading premium listings from Cloudflare D1...
+        </div>
+        <div id="error-msg"></div>
+        <div id="billboards-grid"></div>
+    </main>
+
+    <!-- Python Frontend Logic -->
+    <script type="py">
+        from pyodide.http import pyfetch
+        from pyscript import document
+        import asyncio
+
+        async def load_billboards():
+            try:
+                # Try fetching from the local worker running on port 8787
+                # or fallback to relative URL if deployed together
+                try:
+                    response = await pyfetch("http://localhost:8787/api/billboards")
+                    data = await response.json()
+                except Exception:
+                    response = await pyfetch("/api/billboards")
+                    data = await response.json()
+
+                grid = document.getElementById("billboards-grid")
+                loading = document.getElementById("loading")
+                
+                loading.style.display = "none"
+                
+                if not data:
+                    grid.innerHTML = "<p style='text-align:center;width:100%;'>No billboards found in the database.</p>"
+                    return
+
+                for b in data:
+                    card = document.createElement("div")
+                    card.className = "card"
+                    
+                    img_src = b.get("image_url") or "https://images.unsplash.com/photo-1542204165-65bf26472b9b?q=80&w=600&auto=format&fit=crop"
+                    if not img_src.startswith("http"):
+                        img_src = "https://images.unsplash.com/photo-1542204165-65bf26472b9b?q=80&w=600&auto=format&fit=crop"
+                        
+                    title = b.get('title', 'Unknown Title')
+                    city = b.get('city', 'Unknown City')
+                    media = b.get('media_type', 'Billboard')
+                    size = b.get('size', 'N/A')
+                    price = b.get('price', 'N/A')
+                    
+                    card.innerHTML = f"""
+                        <img class="card-img" src="{img_src}" alt="{title}" loading="lazy" />
+                        <div class="card-content">
+                            <h2 class="card-title">{title}</h2>
+                            <div class="card-meta">
+                                <span class="badge">{city}</span>
+                                <span class="badge">{media}</span>
+                                <span class="badge">{size}</span>
+                            </div>
+                            <div class="card-price">{price}</div>
+                        </div>
+                    """
+                    grid.appendChild(card)
+
+            except Exception as e:
+                loading = document.getElementById("loading")
+                loading.style.display = "none"
+                error_div = document.getElementById("error-msg")
+                error_div.style.display = "block"
+                error_div.innerText = f"Error loading data: {str(e)}\n\nMake sure your Cloudflare Worker is running on port 8787!"
+                print(f"Error: {str(e)}")
+
+        asyncio.ensure_future(load_billboards())
+    </script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+env/
+
+# cloudflare
+.wrangler/
+node_modules/
+dist/
+
+# misc
+.DS_Store
