@@ -1,0 +1,15 @@
+{
+  "name": "adbuq-scraper",
+  "version": "1.0.0",
+  "description": "ADBUQ Billboards Scraper and API",
+  "scripts": {
+    "start": "wrangler dev",
+    "deploy:backend": "wrangler deploy",
+    "deploy:frontend": "wrangler pages deploy public"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240117.0",
+    "typescript": "^5.3.3",
+    "wrangler": "^3.22.0"
+  }
+}

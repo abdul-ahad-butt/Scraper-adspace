@@ -33,12 +33,15 @@
 
         async def load_billboards():
             try:
-                # Try fetching from the local worker running on port 8787
-                # or fallback to relative URL if deployed together
+                # IMPORTANT: When you deploy your backend to Cloudflare Workers, 
+                # replace this URL with your actual worker URL (e.g., https://adbuq-scraper.your-username.workers.dev/api/billboards)
+                PRODUCTION_API_URL = "http://localhost:8787/api/billboards"
+                
                 try:
-                    response = await pyfetch("http://localhost:8787/api/billboards")
+                    response = await pyfetch(PRODUCTION_API_URL)
                     data = await response.json()
                 except Exception:
+                    # Fallback for relative fetching if hosted on the same domain
                     response = await pyfetch("/api/billboards")
                     data = await response.json()
 
