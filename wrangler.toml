@@ -5,4 +5,4 @@ compatibility_date = "2024-01-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "adbuq-db"
-database_id = "00000000-0000-0000-0000-000000000000"
+database_id = "3e106b0d-806f-4cee-82ef-a0a2e4a00da3"
