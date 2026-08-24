@@ -6,9 +6,7 @@
     <title>ADBUQ Billboards - Premium Listings</title>
     <!-- Modern font -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <!-- PyScript -->
-    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css" />
-    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="index.css">
 </head>
@@ -25,72 +23,75 @@
         <div id="billboards-grid"></div>
     </main>
 
-    <!-- Python Frontend Logic -->
-    <script type="py">
-        from pyodide.http import pyfetch
-        from pyscript import document
-        import asyncio
-
-        async def load_billboards():
-            try:
-                # IMPORTANT: When you deploy your backend to Cloudflare Workers, 
-                # replace this URL with your actual worker URL (e.g., https://adbuq-scraper.your-username.workers.dev/api/billboards)
-                PRODUCTION_API_URL = "http://localhost:8787/api/billboards"
+    <!-- Vanilla JS Frontend Logic (Replaced PyScript to fix WebAssembly/CDN errors) -->
+    <script>
+        async function loadBillboards() {
+            try {
+                // Actual Worker URL
+                const PRODUCTION_API_URL = "https://adbuq-scraper.abdulahadbutt420.workers.dev/api/billboards";
                 
-                try:
-                    response = await pyfetch(PRODUCTION_API_URL)
-                    data = await response.json()
-                except Exception:
-                    # Fallback for relative fetching if hosted on the same domain
-                    response = await pyfetch("/api/billboards")
-                    data = await response.json()
+                let data;
+                try {
+                    const response = await fetch(PRODUCTION_API_URL);
+                    data = await response.json();
+                } catch (err) {
+                    // Fallback to relative fetching if hosted on the same domain
+                    const response = await fetch("/api/billboards");
+                    data = await response.json();
+                }
 
-                grid = document.getElementById("billboards-grid")
-                loading = document.getElementById("loading")
+                const grid = document.getElementById("billboards-grid");
+                const loading = document.getElementById("loading");
                 
-                loading.style.display = "none"
+                loading.style.display = "none";
                 
-                if not data:
-                    grid.innerHTML = "<p style='text-align:center;width:100%;'>No billboards found in the database.</p>"
-                    return
+                if (!data || data.length === 0) {
+                    grid.innerHTML = "<p style='text-align:center;width:100%;'>No billboards found in the database.</p>";
+                    return;
+                }
 
-                for b in data:
-                    card = document.createElement("div")
-                    card.className = "card"
+                data.forEach(b => {
+                    const card = document.createElement("div");
+                    card.className = "card";
                     
-                    img_src = b.get("image_url") or "https://images.unsplash.com/photo-1542204165-65bf26472b9b?q=80&w=600&auto=format&fit=crop"
-                    if not img_src.startswith("http"):
-                        img_src = "https://images.unsplash.com/photo-1542204165-65bf26472b9b?q=80&w=600&auto=format&fit=crop"
+                    let imgSrc = b.image_url || "https://images.unsplash.com/photo-1542204165-65bf26472b9b?q=80&w=600&auto=format&fit=crop";
+                    if (!imgSrc.startsWith("http")) {
+                        imgSrc = "https://images.unsplash.com/photo-1542204165-65bf26472b9b?q=80&w=600&auto=format&fit=crop";
+                    }
                         
-                    title = b.get('title', 'Unknown Title')
-                    city = b.get('city', 'Unknown City')
-                    media = b.get('media_type', 'Billboard')
-                    size = b.get('size', 'N/A')
-                    price = b.get('price', 'N/A')
+                    const title = b.title || 'Unknown Title';
+                    const city = b.city || 'Unknown City';
+                    const media = b.media_type || 'Billboard';
+                    const size = b.size || 'N/A';
+                    const price = b.price || 'N/A';
                     
-                    card.innerHTML = f"""
-                        <img class="card-img" src="{img_src}" alt="{title}" loading="lazy" />
+                    card.innerHTML = `
+                        <img class="card-img" src="${imgSrc}" alt="${title}" loading="lazy" />
                         <div class="card-content">
-                            <h2 class="card-title">{title}</h2>
+                            <h2 class="card-title">${title}</h2>
                             <div class="card-meta">
-                                <span class="badge">{city}</span>
-                                <span class="badge">{media}</span>
-                                <span class="badge">{size}</span>
+                                <span class="badge">${city}</span>
+                                <span class="badge">${media}</span>
+                                <span class="badge">${size}</span>
                             </div>
-                            <div class="card-price">{price}</div>
+                            <div class="card-price">${price}</div>
                         </div>
-                    """
-                    grid.appendChild(card)
+                    `;
+                    grid.appendChild(card);
+                });
 
-            except Exception as e:
-                loading = document.getElementById("loading")
-                loading.style.display = "none"
-                error_div = document.getElementById("error-msg")
-                error_div.style.display = "block"
-                error_div.innerText = f"Error loading data: {str(e)}\n\nMake sure your Cloudflare Worker is running on port 8787!"
-                print(f"Error: {str(e)}")
+            } catch (e) {
+                const loading = document.getElementById("loading");
+                loading.style.display = "none";
+                const errorDiv = document.getElementById("error-msg");
+                errorDiv.style.display = "block";
+                errorDiv.innerText = `Error loading data: ${e.message}\n\nMake sure your Cloudflare Worker is deployed and the PRODUCTION_API_URL is correctly set in index.html!`;
+                console.error("Error:", e);
+            }
+        }
 
-        asyncio.ensure_future(load_billboards())
+        // Run the function when the page loads
+        document.addEventListener("DOMContentLoaded", loadBillboards);
     </script>
 </body>
 </html>
