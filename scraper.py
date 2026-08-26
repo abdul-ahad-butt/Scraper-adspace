@@ -5,6 +5,8 @@ from bs4 import BeautifulSoup
 import time
 import uuid
 
+import urllib.parse
+
 def clean_text(text):
     if not text:
         return ""
@@ -140,30 +142,78 @@ def scrape_adbuq():
 
                 availability_status = "Login to view date"
 
-                img = card.find("img")
                 img_url = ""
-                if img:
+                # 1. Prioritize data attributes on img tags
+                imgs = card.find_all("img")
+                for img in imgs:
                     candidates = [
                         img.get("data-src"),
                         img.get("data-lazy-src"),
+                        img.get("data-bg"),
                         img.get("data-original"),
-                        img.get("srcset"),
-                        img.get("src")
+                        img.get("srcset")
                     ]
                     for cand in candidates:
                         if cand and isinstance(cand, str):
-                            # For srcset, take the first url
                             c_url = cand.split(",")[0].split(" ")[0].strip()
-                            if "data:image" not in c_url and "1x1" not in c_url and c_url != "":
+                            if "data:image" not in c_url and "1x1" not in c_url and "placeholder" not in c_url and c_url:
                                 img_url = c_url
                                 break
+                    if not img_url:
+                        cand = img.get("src")
+                        if cand and isinstance(cand, str):
+                            if "data:image" not in cand and "1x1" not in cand and "placeholder" not in cand:
+                                img_url = cand.strip()
+                    if img_url:
+                        break
 
-                if img_url and img_url.startswith("/"):
-                    img_url = "https://www.adbuq.com" + img_url
-                    
-                # Fix any missing scheme
-                if img_url and img_url.startswith("wp-content"):
-                    img_url = "https://www.adbuq.com/" + img_url
+                # 2. Extract CSS background images
+                if not img_url:
+                    styled_elements = card.find_all(["div", "a"], style=True)
+                    for el in styled_elements:
+                        style = el.get("style", "")
+                        bg_match = re.search(r"background-image:\s*url\(['\"]?(.*?)['\"]?\)", style, re.I)
+                        if bg_match:
+                            cand = bg_match.group(1).strip()
+                            if "data:image" not in cand and "1x1" not in cand and "placeholder" not in cand and cand:
+                                img_url = cand
+                                break
+
+                # 3. Scrape the detail page if necessary
+                if not img_url and detail_url:
+                    print(f"Scraping detail page for image: {detail_url}")
+                    try:
+                        detail_resp = requests.get(detail_url, headers=headers, timeout=10)
+                        if detail_resp.status_code == 200:
+                            detail_soup = BeautifulSoup(detail_resp.text, "html.parser")
+                            main_imgs = detail_soup.select(".woocommerce-product-gallery__image img, .property-slider img, .single-property-image img, .entry-content img, .wp-post-image")
+                            for img in main_imgs:
+                                candidates = [
+                                    img.get("data-src"),
+                                    img.get("data-lazy-src"),
+                                    img.get("data-bg"),
+                                    img.get("data-original"),
+                                    img.get("srcset")
+                                ]
+                                for cand in candidates:
+                                    if cand and isinstance(cand, str):
+                                        c_url = cand.split(",")[0].split(" ")[0].strip()
+                                        if "data:image" not in c_url and "1x1" not in c_url and "placeholder" not in c_url and c_url:
+                                            img_url = c_url
+                                            break
+                                if not img_url:
+                                    cand = img.get("src")
+                                    if cand and isinstance(cand, str):
+                                        if "data:image" not in cand and "1x1" not in cand and "placeholder" not in cand:
+                                            img_url = cand.strip()
+                                if img_url:
+                                    break
+                    except requests.RequestException:
+                        pass
+
+                # 4. Ensure Absolute URLs
+                if img_url:
+                    img_url = urllib.parse.urljoin('https://www.adbuq.com', img_url)
 
                 record = {
                     "title": title,
