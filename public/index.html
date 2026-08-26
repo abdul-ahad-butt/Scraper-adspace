@@ -66,7 +66,7 @@
                     const price = b.price || 'N/A';
                     
                     card.innerHTML = `
-                        <img class="card-img" src="${imgSrc}" alt="${title}" loading="lazy" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1542204165-65bf26472b9b?q=80&w=600&auto=format&fit=crop';" />
+                        <img class="card-img" src="${imgSrc}" alt="${title}" loading="lazy" referrerpolicy="no-referrer" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1542204165-65bf26472b9b?q=80&w=600&auto=format&fit=crop';" />
                         <div class="card-content">
                             <h2 class="card-title">${title}</h2>
                             <div class="card-meta">
