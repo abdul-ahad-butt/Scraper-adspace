@@ -50,6 +50,12 @@ def scrape_adbuq():
         "https://www.adbuq.com/billboards/"
     ]
     
+    # Add cities for wider crawling coverage
+    cities_for_urls = ["lahore", "karachi", "islamabad", "peshawar", "quetta", "multan", "rawalpindi"]
+    for c in cities_for_urls:
+        base_urls.append(f"https://www.adbuq.com/product-category/{c}/")
+        base_urls.append(f"https://www.adbuq.com/billboards-in-{c}/")
+    
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Referer": "https://www.google.com/",
@@ -83,7 +89,7 @@ def scrape_adbuq():
             
             cards = soup.find_all("div", class_=re.compile(r"item-listing-wrap|property-listing|item-wrap-v", re.I))
             if not cards:
-                cards = soup.select(".featured-item, .listing-item, .ooh-item, div[class*='billboard']")
+                cards = soup.select(".featured-item, .listing-item, .ooh-item, div[class*='billboard'], .product")
 
             if not cards:
                 print("No cards found on this page. Stopping pagination.")
@@ -137,7 +143,27 @@ def scrape_adbuq():
                 img = card.find("img")
                 img_url = ""
                 if img:
-                    img_url = img.get("data-src") or img.get("src") or ""
+                    candidates = [
+                        img.get("data-src"),
+                        img.get("data-lazy-src"),
+                        img.get("data-original"),
+                        img.get("srcset"),
+                        img.get("src")
+                    ]
+                    for cand in candidates:
+                        if cand and isinstance(cand, str):
+                            # For srcset, take the first url
+                            c_url = cand.split(",")[0].split(" ")[0].strip()
+                            if "data:image" not in c_url and "1x1" not in c_url and c_url != "":
+                                img_url = c_url
+                                break
+
+                if img_url and img_url.startswith("/"):
+                    img_url = "https://www.adbuq.com" + img_url
+                    
+                # Fix any missing scheme
+                if img_url and img_url.startswith("wp-content"):
+                    img_url = "https://www.adbuq.com/" + img_url
 
                 record = {
                     "title": title,
@@ -149,8 +175,8 @@ def scrape_adbuq():
                     "zone": zone,
                     "extendable": extendable,
                     "availability_status": availability_status,
-                    "image_url": img_url,
-                    "detail_url": detail_url,
+                    "image_url": clean_text(img_url),
+                    "detail_url": clean_text(detail_url),
                 }
                 records.append(record)
                 new_records_on_page += 1
@@ -168,14 +194,20 @@ def scrape_adbuq():
         print("No records scraped. Returning without SQL generation.")
         return
 
-    sql_statements = []
-    for r in records:
-        stmt = f"""INSERT INTO billboards (title, media_type, city, price, numeric_price, size, zone, extendable, availability_status, image_url, detail_url)
-VALUES ('{r['title']}', '{r['media_type']}', '{r['city']}', '{r['price']}', {r['numeric_price']}, '{r['size']}', '{r['zone']}', '{r['extendable']}', '{r['availability_status']}', '{r['image_url']}', '{r['detail_url']}');"""
-        sql_statements.append(stmt)
-
+    # Split into batches of 50
+    batch_size = 50
     with open("inserts.sql", "w", encoding="utf-8") as f:
-        f.write("\n".join(sql_statements))
+        for i in range(0, len(records), batch_size):
+            batch = records[i:i+batch_size]
+            values = []
+            for r in batch:
+                v = f"('{r['title']}', '{r['media_type']}', '{r['city']}', '{r['price']}', {r['numeric_price']}, '{r['size']}', '{r['zone']}', '{r['extendable']}', '{r['availability_status']}', '{r['image_url']}', '{r['detail_url']}')"
+                values.append(v)
+                
+            stmt = "INSERT INTO billboards (title, media_type, city, price, numeric_price, size, zone, extendable, availability_status, image_url, detail_url) VALUES \n"
+            stmt += ",\n".join(values) + ";"
+            
+            f.write(stmt + "\n\n")
 
     print("Generated inserts.sql successfully!")
 
