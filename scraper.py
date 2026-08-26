@@ -81,11 +81,7 @@ def scrape_adbuq():
 
             soup = BeautifulSoup(response.text, "html.parser")
             
-            cards = soup.find_all(
-                ["div", "article", "li"], 
-                class_=re.compile(r"card|item|listing|product|type-product", re.I)
-            )
-
+            cards = soup.find_all("div", class_=re.compile(r"item-listing-wrap|property-listing|item-wrap-v", re.I))
             if not cards:
                 cards = soup.select(".featured-item, .listing-item, .ooh-item, div[class*='billboard']")
 
@@ -98,13 +94,14 @@ def scrape_adbuq():
             for card in cards:
                 text_content = card.get_text(separator=" ", strip=True)
                 
-                title_elem = card.find(["h2", "h3", "h4", "a"], class_=re.compile(r"title|name", re.I))
+                title_elem = card.find(["h2", "h3", "h4"], class_=re.compile(r"title|name", re.I))
                 if not title_elem:
                     title_elem = card.find("h2") or card.find("h3")
 
                 title = clean_text(title_elem.get_text()) if title_elem else ""
                 
-                link = card.find("a", href=True)
+                # Get detail_url from the title element link to avoid getting label links
+                link = title_elem.find("a", href=True) if title_elem else None
                 detail_url = link["href"] if link else ""
 
                 if not title or len(title) < 5 or not detail_url:
