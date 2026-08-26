@@ -29,6 +29,30 @@ export default {
       });
     }
 
+    if (url.pathname === "/api/image") {
+      const targetUrl = url.searchParams.get("url");
+      if (!targetUrl) return new Response("Missing url parameter", { status: 400, headers: corsHeaders });
+
+      try {
+        const imageResponse = await fetch(targetUrl, {
+          headers: {
+            "Referer": "https://www.adbuq.com/",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          }
+        });
+
+        const headers = new Headers(imageResponse.headers);
+        headers.set("Access-Control-Allow-Origin", "*");
+
+        return new Response(imageResponse.body, {
+          status: imageResponse.status,
+          headers: headers
+        });
+      } catch (e) {
+        return new Response("Error fetching image", { status: 500, headers: corsHeaders });
+      }
+    }
+
     return new Response("Not Found", { status: 404, headers: corsHeaders });
   },
 };

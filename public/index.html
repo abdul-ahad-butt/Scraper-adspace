@@ -57,6 +57,10 @@
                     let imgSrc = b.image_url || "https://images.unsplash.com/photo-1542204165-65bf26472b9b?q=80&w=600&auto=format&fit=crop";
                     if (!imgSrc.startsWith("http")) {
                         imgSrc = "https://images.unsplash.com/photo-1542204165-65bf26472b9b?q=80&w=600&auto=format&fit=crop";
+                    } else if (imgSrc.includes("adbuq.com")) {
+                        // Pass adbuq images through the Cloudflare worker proxy to bypass hotlinking protection
+                        const PROXY_URL = PRODUCTION_API_URL.replace("/api/billboards", "/api/image");
+                        imgSrc = `${PROXY_URL}?url=${encodeURIComponent(imgSrc)}`;
                     }
                         
                     const title = b.title || 'Unknown Title';
