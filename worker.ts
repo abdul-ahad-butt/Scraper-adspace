@@ -34,7 +34,8 @@ export default {
       if (!targetUrl) return new Response("Missing url parameter", { status: 400, headers: corsHeaders });
 
       try {
-        const imageResponse = await fetch(targetUrl, {
+        const normalizedUrl = new URL(targetUrl).href;
+        const imageResponse = await fetch(normalizedUrl, {
           headers: {
             "Referer": "https://www.adbuq.com/",
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
