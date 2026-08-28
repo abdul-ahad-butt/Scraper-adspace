@@ -4,8 +4,12 @@ import requests
 from bs4 import BeautifulSoup
 import time
 import uuid
-
+import os
 import urllib.parse
+import boto3
+from dotenv import load_dotenv
+from io import BytesIO
+import mimetypes
 
 def clean_text(text):
     if not text:
@@ -46,6 +50,26 @@ def parse_price(price_str):
     return 0.0
 
 def scrape_adbuq():
+    load_dotenv()
+    
+    r2_account_id = os.environ.get("R2_ACCOUNT_ID")
+    r2_access_key_id = os.environ.get("R2_ACCESS_KEY_ID")
+    r2_secret_access_key = os.environ.get("R2_SECRET_ACCESS_KEY")
+    r2_bucket_name = os.environ.get("R2_BUCKET_NAME")
+    r2_public_domain = os.environ.get("R2_PUBLIC_DOMAIN", "").rstrip('/')
+    
+    if not all([r2_account_id, r2_access_key_id, r2_secret_access_key, r2_bucket_name, r2_public_domain]):
+        print("Missing required R2 configuration in .env file. Exiting.")
+        return
+
+    s3_client = boto3.client(
+        's3',
+        endpoint_url=f"https://{r2_account_id}.r2.cloudflarestorage.com",
+        aws_access_key_id=r2_access_key_id,
+        aws_secret_access_key=r2_secret_access_key,
+        region_name="auto"
+    )
+
     base_urls = [
         "https://www.adbuq.com/",
         "https://www.adbuq.com/shop/",
@@ -215,6 +239,44 @@ def scrape_adbuq():
                 if img_url:
                     img_url = urllib.parse.urljoin('https://www.adbuq.com', img_url)
 
+                # 5. R2 Image Download and Upload
+                final_image_url = "NULL"
+                if img_url:
+                    try:
+                        print(f"Downloading image: {img_url}")
+                        img_resp = requests.get(img_url, headers=headers, stream=True, timeout=15)
+                        if img_resp.status_code == 200:
+                            content_type = img_resp.headers.get('content-type')
+                            if not content_type:
+                                content_type = mimetypes.guess_type(img_url)[0] or 'application/octet-stream'
+                            
+                            ext = mimetypes.guess_extension(content_type) or '.jpg'
+                            if ext == '.jpe':
+                                ext = '.jpg'
+                                
+                            # Create slugified title for filename or fallback to uuid
+                            slug = re.sub(r'[^a-z0-9]+', '-', title.lower()).strip('-')
+                            if not slug:
+                                slug = str(uuid.uuid4())
+                            
+                            filename = f"{slug}-{uuid.uuid4().hex[:8]}{ext}"
+                            
+                            print(f"Uploading to R2 as {filename}")
+                            file_obj = BytesIO(img_resp.content)
+                            s3_client.upload_fileobj(
+                                file_obj,
+                                r2_bucket_name,
+                                filename,
+                                ExtraArgs={'ContentType': content_type}
+                            )
+                            
+                            final_image_url = f"{r2_public_domain}/{filename}"
+                            time.sleep(0.5) # Rate limiting
+                        else:
+                            print(f"Failed to download image, status: {img_resp.status_code}")
+                    except Exception as e:
+                        print(f"Error downloading/uploading image {img_url}: {e}")
+
                 record = {
                     "title": title,
                     "media_type": media_type,
@@ -225,7 +287,7 @@ def scrape_adbuq():
                     "zone": zone,
                     "extendable": extendable,
                     "availability_status": availability_status,
-                    "image_url": clean_text(img_url),
+                    "image_url": clean_text(final_image_url),
                     "detail_url": clean_text(detail_url),
                 }
                 records.append(record)
@@ -251,7 +313,8 @@ def scrape_adbuq():
             batch = records[i:i+batch_size]
             values = []
             for r in batch:
-                v = f"('{r['title']}', '{r['media_type']}', '{r['city']}', '{r['price']}', {r['numeric_price']}, '{r['size']}', '{r['zone']}', '{r['extendable']}', '{r['availability_status']}', '{r['image_url']}', '{r['detail_url']}')"
+                img_val = f"'{r['image_url']}'" if r['image_url'] and r['image_url'] != "NULL" else "NULL"
+                v = f"('{r['title']}', '{r['media_type']}', '{r['city']}', '{r['price']}', {r['numeric_price']}, '{r['size']}', '{r['zone']}', '{r['extendable']}', '{r['availability_status']}', {img_val}, '{r['detail_url']}')"
                 values.append(v)
                 
             stmt = "INSERT INTO billboards (title, media_type, city, price, numeric_price, size, zone, extendable, availability_status, image_url, detail_url) VALUES \n"
